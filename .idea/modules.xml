@@ -2,11 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/snapdroid.iml" filepath="$PROJECT_DIR$/.idea/modules/snapdroid.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.iml" filepath="$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.androidTest.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.main.iml" filepath="$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.main.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/Snapcast/snapdroid.Snapcast.unitTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Snapcast.iml" filepath="$PROJECT_DIR$/.idea/modules/Snapcast.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/Snapcast.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/Snapcast.app.iml" />
     </modules>
   </component>
 </project>
