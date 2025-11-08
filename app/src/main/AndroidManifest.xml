@@ -51,7 +51,7 @@
         </receiver>
 
         <service
-            android:name=".SnapclientService"
+            android:name=".SnapcastService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback" />
     </application>

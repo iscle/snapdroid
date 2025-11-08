@@ -31,6 +31,7 @@ fun GroupCard(
     onIsMutedChange: (Boolean) -> Unit,
     volume: Float,
     onVolumeChange: (Float) -> Unit,
+    onSettingsClick: () -> Unit,
     sinks: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -45,7 +46,8 @@ fun GroupCard(
                 isMuted = isMuted,
                 onIsMutedChange = onIsMutedChange,
                 volume = volume,
-                onVolumeChange = onVolumeChange
+                onVolumeChange = onVolumeChange,
+                onSettingsClick = onSettingsClick
             )
 
             HorizontalDivider(Modifier.fillMaxWidth())
@@ -62,7 +64,8 @@ fun GroupCardHeader(
     isMuted: Boolean,
     onIsMutedChange: (Boolean) -> Unit,
     volume: Float,
-    onVolumeChange: (Float) -> Unit
+    onVolumeChange: (Float) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Column {
         Row(
@@ -94,9 +97,7 @@ fun GroupCardHeader(
                 }
 
                 IconButton(
-                    onClick = {
-
-                    }
+                    onClick = onSettingsClick
                 ) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
@@ -122,8 +123,8 @@ fun GroupCardSink(
     isMuted: Boolean,
     onIsMutedChange: (Boolean) -> Unit,
     volume: Float,
-    onVolumeChange: (Float) -> Unit
-
+    onVolumeChange: (Float) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Column {
         Row(
@@ -160,9 +161,7 @@ fun GroupCardSink(
                 }
 
                 IconButton(
-                    onClick = {
-
-                    }
+                    onClick = onSettingsClick
                 ) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,

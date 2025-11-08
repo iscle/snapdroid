@@ -6,7 +6,7 @@ import androidx.lifecycle.LifecycleService
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class SnapclientService : LifecycleService() {
+class SnapcastService : LifecycleService() {
     override fun onBind(intent: Intent): IBinder? {
         super.onBind(intent)
         return null

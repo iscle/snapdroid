@@ -27,6 +27,7 @@ android {
                 cppFlags += "-std=c++14"
                 arguments += "-DANDROID_STL=c++_static"
                 arguments += "-DBUILD_SERVER=OFF"
+                arguments += "-DBUILD_WITH_SSL=OFF"
                 arguments += "-DBUILD_TESTS=OFF"
             }
         }

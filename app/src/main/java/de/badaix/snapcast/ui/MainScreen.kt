@@ -9,26 +9,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SpeakerGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,22 +34,20 @@ import de.badaix.snapcast.ui.component.GroupCardSink
 fun MainScreen(
     viewModel: MainViewModel = viewModel()
 ) {
-    var selectedDestination by remember { mutableIntStateOf(0) }
     var started by remember { mutableStateOf(false) }
+    var groupSettingsOpen by remember { mutableStateOf(false) }
+    var deviceSettingsOpen by remember { mutableStateOf(false) }
+    var selectedGroupName by remember { mutableStateOf<String?>(null) }
+    var selectedDeviceName by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             MainTopBar(
-                subtitle = "rk3318-box"
+                subtitle = "rk3318-box",
+                onSettingsClick = { /* TODO */ }
             )
         },
-//        bottomBar = {
-//            MainBottomBar(
-//                selectedDestination = selectedDestination,
-//                onDestinationSelected = { selectedDestination = it }
-//            )
-//        },
         floatingActionButton = {
             MainFloatingActionButton(
                 started = started,
@@ -68,8 +61,36 @@ fun MainScreen(
         }
     ) { innerPadding ->
         MainContent(
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            onGroupSettingsClick = { groupName ->
+                selectedGroupName = groupName
+                groupSettingsOpen = true
+            },
+            onDeviceSettingsClick = { deviceName ->
+                selectedDeviceName = deviceName
+                deviceSettingsOpen = true
+            }
         )
+
+        if (groupSettingsOpen && selectedGroupName != null) {
+            GroupSettingsBottomSheet(
+                groupName = selectedGroupName!!,
+                onDismiss = {
+                    groupSettingsOpen = false
+                    selectedGroupName = null
+                }
+            )
+        }
+
+        if (deviceSettingsOpen && selectedDeviceName != null) {
+            DeviceSettingsBottomSheet(
+                deviceName = selectedDeviceName!!,
+                onDismiss = {
+                    deviceSettingsOpen = false
+                    selectedDeviceName = null
+                }
+            )
+        }
     }
 }
 
@@ -77,6 +98,7 @@ fun MainScreen(
 @Composable
 private fun MainTopBar(
     subtitle: String?,
+    onSettingsClick: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -85,6 +107,16 @@ private fun MainTopBar(
                 subtitle?.let {
                     Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
                 }
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onSettingsClick
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings"
+                )
             }
         }
     )
@@ -113,56 +145,12 @@ private fun MainFloatingActionButton(
     }
 }
 
-private enum class Destination(
-    val icon: ImageVector,
-    val contentDescription: String,
-    val label: String,
-) {
-    GROUPS(
-        icon = Icons.Outlined.SpeakerGroup,
-        contentDescription = "Groups",
-        label = "Groups"
-    ),
-    SETTINGS(
-        icon = Icons.Outlined.Settings,
-        contentDescription = "Settings",
-        label = "Settings"
-    ),
-    ABOUT(
-        icon = Icons.Outlined.Info,
-        contentDescription = "About",
-        label = "About"
-    )
-}
-
-@Composable
-private fun MainBottomBar(
-    selectedDestination: Int,
-    onDestinationSelected: (Int) -> Unit
-) {
-    NavigationBar {
-        Destination.entries.forEachIndexed { index, destination ->
-            NavigationBarItem(
-                selected = selectedDestination == index,
-                onClick = {
-                    onDestinationSelected(index)
-                },
-                icon = {
-                    Icon(
-                        destination.icon,
-                        contentDescription = destination.contentDescription
-                    )
-                },
-                label = { Text(destination.label) }
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainContent(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onGroupSettingsClick: (String) -> Unit,
+    onDeviceSettingsClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -170,20 +158,24 @@ private fun MainContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(3) { index ->
+            val groupName = "Group $index"
             GroupCard(
-                name = "Group $index",
+                name = groupName,
                 isMuted = false,
                 onIsMutedChange = {  },
                 volume = 0.5f,
                 onVolumeChange = {  },
+                onSettingsClick = { onGroupSettingsClick(groupName) },
                 sinks = {
                     for (i in 1..3) {
+                        val deviceName = "Sink $i"
                         GroupCardSink(
-                            name = "Sink $i",
+                            name = deviceName,
                             isMuted = false,
                             onIsMutedChange = {  },
                             volume = 0.5f,
-                            onVolumeChange = {  }
+                            onVolumeChange = {  },
+                            onSettingsClick = { onDeviceSettingsClick(deviceName) }
                         )
                     }
                 }
