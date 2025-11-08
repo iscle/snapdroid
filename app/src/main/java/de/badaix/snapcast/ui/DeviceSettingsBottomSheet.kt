@@ -16,7 +16,17 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import de.badaix.snapcast.ui.theme.SnapdroidTheme
+
+private object DeviceSettingsBottomSheetDefaults {
+    const val HORIZONTAL_PADDING = 16
+    const val VERTICAL_PADDING = 8
+    const val TITLE_BOTTOM_PADDING = 8
+    const val DIVIDER_VERTICAL_PADDING = 8
+    const val BOTTOM_SPACER = 16
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,22 +43,27 @@ fun DeviceSettingsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(
+                    horizontal = DeviceSettingsBottomSheetDefaults.HORIZONTAL_PADDING.dp,
+                    vertical = DeviceSettingsBottomSheetDefaults.VERTICAL_PADDING.dp
+                )
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
                 text = "Device Details",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = DeviceSettingsBottomSheetDefaults.TITLE_BOTTOM_PADDING.dp)
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = DeviceSettingsBottomSheetDefaults.DIVIDER_VERTICAL_PADDING.dp)
+            )
 
             Text(
                 text = "Device: $deviceName",
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = DeviceSettingsBottomSheetDefaults.VERTICAL_PADDING.dp)
             )
 
             // TODO: Add device-specific details and settings here
@@ -59,8 +74,19 @@ fun DeviceSettingsBottomSheet(
             // - Host information
             // - Last seen information
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(DeviceSettingsBottomSheetDefaults.BOTTOM_SPACER.dp))
         }
+    }
+}
+
+@Preview(name = "Device Settings Bottom Sheet", showBackground = true)
+@Composable
+private fun DeviceSettingsBottomSheetPreview() {
+    SnapdroidTheme {
+        DeviceSettingsBottomSheet(
+            deviceName = "Kitchen Speaker",
+            onDismiss = {}
+        )
     }
 }
 

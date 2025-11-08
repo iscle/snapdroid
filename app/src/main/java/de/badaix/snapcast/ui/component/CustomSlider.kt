@@ -3,19 +3,32 @@ package de.badaix.snapcast.ui.component
 import androidx.annotation.IntRange
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SliderState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import de.badaix.snapcast.ui.theme.SnapdroidTheme
+
+private object CustomSliderDefaults {
+    const val THUMB_SIZE = 20
+    const val TRACK_HEIGHT = 4
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,7 +43,7 @@ fun CustomSlider(
     @IntRange(from = 0) steps: Int = 0,
     thumb: @Composable (SliderState) -> Unit = {
         val colors = SliderDefaults.colors()
-        Canvas(modifier = Modifier.size(20.dp)) {
+        Canvas(modifier = Modifier.size(CustomSliderDefaults.THUMB_SIZE.dp)) {
             drawCircle(color = colors.thumbColor)
         }
     },
@@ -39,7 +52,7 @@ fun CustomSlider(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp)
+                .height(CustomSliderDefaults.TRACK_HEIGHT.dp)
         ) {
             val fraction = sliderState.coercedValueAsFraction
 
@@ -81,4 +94,68 @@ fun CustomSlider(
         track = track,
         valueRange = valueRange
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(name = "Custom Slider - Default", showBackground = true)
+@Composable
+private fun CustomSliderPreview() {
+    SnapdroidTheme {
+        var value by remember { mutableFloatStateOf(0.5f) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text("Volume: ${(value * 100).toInt()}%")
+            CustomSlider(
+                value = value,
+                onValueChange = { value = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(name = "Custom Slider - With Steps", showBackground = true)
+@Composable
+private fun CustomSliderWithStepsPreview() {
+    SnapdroidTheme {
+        var value by remember { mutableFloatStateOf(0.75f) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text("Volume: ${(value * 100).toInt()}%")
+            CustomSlider(
+                value = value,
+                onValueChange = { value = it },
+                steps = 99,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(name = "Custom Slider - Disabled", showBackground = true)
+@Composable
+private fun CustomSliderDisabledPreview() {
+    SnapdroidTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text("Volume: 50%")
+            CustomSlider(
+                value = 0.5f,
+                onValueChange = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }

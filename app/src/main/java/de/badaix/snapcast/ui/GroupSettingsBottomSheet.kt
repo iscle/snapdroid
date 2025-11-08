@@ -14,7 +14,17 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import de.badaix.snapcast.ui.theme.SnapdroidTheme
+
+private object GroupSettingsBottomSheetDefaults {
+    const val HORIZONTAL_PADDING = 16
+    const val VERTICAL_PADDING = 8
+    const val TITLE_BOTTOM_PADDING = 8
+    const val DIVIDER_VERTICAL_PADDING = 8
+    const val BOTTOM_SPACER = 16
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,21 +41,26 @@ fun GroupSettingsBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(
+                    horizontal = GroupSettingsBottomSheetDefaults.HORIZONTAL_PADDING.dp,
+                    vertical = GroupSettingsBottomSheetDefaults.VERTICAL_PADDING.dp
+                )
         ) {
             Text(
                 text = "Group Settings",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = GroupSettingsBottomSheetDefaults.TITLE_BOTTOM_PADDING.dp)
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = GroupSettingsBottomSheetDefaults.DIVIDER_VERTICAL_PADDING.dp)
+            )
 
             Text(
                 text = "Group: $groupName",
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = GroupSettingsBottomSheetDefaults.VERTICAL_PADDING.dp)
             )
 
             // TODO: Add group-specific settings here
@@ -53,8 +68,19 @@ fun GroupSettingsBottomSheet(
             // - Group name editing
             // - Other group settings
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(GroupSettingsBottomSheetDefaults.BOTTOM_SPACER.dp))
         }
+    }
+}
+
+@Preview(name = "Group Settings Bottom Sheet", showBackground = true)
+@Composable
+private fun GroupSettingsBottomSheetPreview() {
+    SnapdroidTheme {
+        GroupSettingsBottomSheet(
+            groupName = "Living Room",
+            onDismiss = {}
+        )
     }
 }
 
