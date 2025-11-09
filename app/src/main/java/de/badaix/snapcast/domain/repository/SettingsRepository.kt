@@ -2,6 +2,7 @@ package de.badaix.snapcast.domain.repository
 
 import de.badaix.snapcast.domain.model.AudioConfiguration
 import de.badaix.snapcast.domain.model.AudioEngine
+import de.badaix.snapcast.domain.model.ServerConfiguration
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -37,5 +38,25 @@ interface SettingsRepository {
      * Observes audio configuration changes
      */
     fun observeAudioConfiguration(): Flow<AudioConfiguration>
+
+    /**
+     * Gets the configured server
+     */
+    suspend fun getServerConfiguration(): ServerConfiguration?
+
+    /**
+     * Sets the server configuration
+     */
+    suspend fun setServerConfiguration(config: ServerConfiguration?)
+
+    /**
+     * Checks if a server is configured
+     */
+    suspend fun hasServerConfiguration(): Boolean
+
+    /**
+     * Observes server configuration changes
+     */
+    fun observeServerConfiguration(): Flow<ServerConfiguration?>
 }
 

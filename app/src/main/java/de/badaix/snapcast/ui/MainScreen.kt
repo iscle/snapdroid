@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Settings
@@ -32,8 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import de.badaix.snapcast.domain.model.PlayerLogEntry
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import de.badaix.snapcast.data.model.Group
+import de.badaix.snapcast.data.model.Volume
 import de.badaix.snapcast.domain.model.PlayerState
 import de.badaix.snapcast.ui.component.GroupCard
 import de.badaix.snapcast.ui.component.GroupCardSink
@@ -45,8 +47,6 @@ private object MainScreenDefaults {
     const val CONTENT_SPACING = 16
     const val DEFAULT_SERVER_HOST = "localhost"
     const val DEFAULT_SERVER_PORT = 1704
-    const val PREVIEW_GROUP_COUNT = 3
-    const val PREVIEW_SINK_COUNT = 3
 }
 
 private object MainScreenStrings {
@@ -58,20 +58,25 @@ private object MainScreenStrings {
 
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel = viewModel()
+    onNavigateToLogs: () -> Unit,
+    viewModel: MainViewModel = hiltViewModel()
 ) {
     val playerState by viewModel.playerState.collectAsState()
-    val playerLogs by viewModel.playerLogs.collectAsState()
     val connectionInfo by viewModel.connectionInfo.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val groups by viewModel.groups.collectAsState()
+    val serverConfiguration by viewModel.serverConfiguration.collectAsState()
+    val discoveredServers by viewModel.discoveredServers.collectAsState()
+    val isDiscovering by viewModel.isDiscovering.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var groupSettingsOpen by remember { mutableStateOf(false) }
     var deviceSettingsOpen by remember { mutableStateOf(false) }
-    var selectedGroupName by remember { mutableStateOf<String?>(null) }
-    var selectedDeviceName by remember { mutableStateOf<String?>(null) }
+    var serverConfigOpen by remember { mutableStateOf(false) }
+    var selectedGroup by remember { mutableStateOf<Group?>(null) }
+    var selectedClient by remember { mutableStateOf<de.badaix.snapcast.data.model.Client?>(null) }
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let { message ->
@@ -83,62 +88,130 @@ fun MainScreen(
     }
 
     val isPlayerActive = playerState is PlayerState.Running || playerState is PlayerState.Starting
+    val hasServerConfiguration = serverConfiguration != null
 
+    @OptIn(ExperimentalMaterial3Api::class)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             MainTopBar(
-                subtitle = connectionInfo?.let { "${it.host}:${it.port}" },
-                onSettingsClick = { /* TODO */ }
+                subtitle = connectionInfo?.let { 
+                    if (it.port == MainScreenDefaults.DEFAULT_SERVER_PORT) {
+                        it.host
+                    } else {
+                        "${it.host}:${it.port}"
+                    }
+                },
+                onSettingsClick = { serverConfigOpen = true },
+                onLogsClick = onNavigateToLogs
             )
         },
         floatingActionButton = {
-            MainFloatingActionButton(
-                isActive = isPlayerActive,
-                onStart = {
-                    viewModel.startPlayer(
-                        host = MainScreenDefaults.DEFAULT_SERVER_HOST,
-                        port = MainScreenDefaults.DEFAULT_SERVER_PORT
-                    )
-                },
-                onStop = {
-                    viewModel.stopPlayer()
-                }
-            )
+            if (hasServerConfiguration) {
+                MainFloatingActionButton(
+                    isActive = isPlayerActive,
+                    onStart = {
+                        serverConfiguration?.let { config ->
+                            viewModel.startPlayer(
+                                host = config.host,
+                                port = config.streamPort
+                            )
+                        }
+                    },
+                    onStop = {
+                        viewModel.stopPlayer()
+                    }
+                )
+            }
         }
     ) { innerPadding ->
-        MainContent(
-            modifier = Modifier.padding(innerPadding),
-            playerState = playerState,
-            connectionInfo = connectionInfo,
-            playerLogs = playerLogs,
-            onGroupSettingsClick = { groupName ->
-                selectedGroupName = groupName
-                groupSettingsOpen = true
-            },
-            onDeviceSettingsClick = { deviceName ->
-                selectedDeviceName = deviceName
-                deviceSettingsOpen = true
-            }
-        )
-
-        if (groupSettingsOpen && selectedGroupName != null) {
-            GroupSettingsBottomSheet(
-                groupName = selectedGroupName!!,
-                onDismiss = {
-                    groupSettingsOpen = false
-                    selectedGroupName = null
+        if (!hasServerConfiguration) {
+            // Show empty state when no server is configured
+            EmptyServerConfigurationScreen(
+                onConfigureServer = { 
+                    serverConfigOpen = true
+                },
+                isSearchingForServers = isDiscovering,
+                modifier = Modifier.padding(innerPadding)
+            )
+        } else {
+            // Show normal content when server is configured
+            MainContent(
+                modifier = Modifier.padding(innerPadding),
+                groups = groups,
+                onGroupMuteChange = { groupId, muted ->
+                    viewModel.setGroupMute(groupId, muted)
+                },
+                onGroupVolumeChange = { groupId, volume ->
+                    // For group volume, we need to update all clients in the group
+                    // This is a simplified approach - in reality, you might want to
+                    // calculate the average and adjust each client proportionally
+                    val currentGroups = groups
+                    currentGroups.find { it.id == groupId }?.clients?.forEach { client ->
+                        viewModel.setClientVolume(
+                            clientId = client.id,
+                            volume = Volume(muted = client.config.volume.muted, percent = volume)
+                        )
+                    }
+                },
+                onClientMuteChange = { clientId, muted ->
+                    viewModel.setClientMute(clientId, muted)
+                },
+                onClientVolumeChange = { clientId, volume ->
+                    val currentGroups = groups
+                    currentGroups.forEach { group ->
+                        group.clients.find { it.id == clientId }?.let { client ->
+                            viewModel.setClientVolume(
+                                clientId = clientId,
+                                volume = Volume(muted = client.config.volume.muted, percent = volume)
+                            )
+                        }
+                    }
+                },
+                onGroupSettingsClick = { group ->
+                    selectedGroup = group
+                    groupSettingsOpen = true
+                },
+                onDeviceSettingsClick = { client ->
+                    selectedClient = client
+                    deviceSettingsOpen = true
                 }
             )
         }
 
-        if (deviceSettingsOpen && selectedDeviceName != null) {
+        if (serverConfigOpen) {
+            ServerConfigurationBottomSheet(
+                onDismiss = { serverConfigOpen = false },
+                onSaveConfiguration = { config ->
+                    viewModel.saveServerConfiguration(config)
+                    serverConfigOpen = false
+                },
+                discoveredServers = discoveredServers,
+                isDiscovering = isDiscovering,
+                onStartDiscovery = { viewModel.startMdnsDiscovery() },
+                onStopDiscovery = { viewModel.stopMdnsDiscovery() },
+                initialConfiguration = serverConfiguration,
+                initiallyShowManualEntry = !hasServerConfiguration // Start with manual entry when no server configured
+            )
+        }
+
+        if (groupSettingsOpen && selectedGroup != null) {
+            GroupSettingsBottomSheet(
+                group = selectedGroup!!,
+                onDismiss = {
+                    groupSettingsOpen = false
+                    selectedGroup = null
+                }
+            )
+        }
+
+        if (deviceSettingsOpen && selectedClient != null) {
             DeviceSettingsBottomSheet(
-                deviceName = selectedDeviceName!!,
+                client = selectedClient!!,
                 onDismiss = {
                     deviceSettingsOpen = false
-                    selectedDeviceName = null
+                    selectedClient = null
                 }
             )
         }
@@ -150,6 +223,7 @@ fun MainScreen(
 private fun MainTopBar(
     subtitle: String?,
     onSettingsClick: () -> Unit,
+    onLogsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     TopAppBar(
@@ -172,6 +246,12 @@ private fun MainTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onLogsClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Article,
+                    contentDescription = "View Player Logs"
+                )
+            }
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
@@ -211,48 +291,45 @@ private fun MainFloatingActionButton(
 @Composable
 private fun MainContent(
     modifier: Modifier = Modifier,
-    playerState: PlayerState,
-    connectionInfo: MainViewModel.ConnectionInfo?,
-    playerLogs: List<de.badaix.snapcast.domain.model.PlayerLogEntry>,
-    onGroupSettingsClick: (String) -> Unit,
-    onDeviceSettingsClick: (String) -> Unit
+    groups: List<Group>,
+    onGroupMuteChange: (String, Boolean) -> Unit,
+    onGroupVolumeChange: (String, Int) -> Unit,
+    onClientMuteChange: (String, Boolean) -> Unit,
+    onClientVolumeChange: (String, Int) -> Unit,
+    onGroupSettingsClick: (Group) -> Unit,
+    onDeviceSettingsClick: (de.badaix.snapcast.data.model.Client) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(MainScreenDefaults.CONTENT_PADDING.dp),
         verticalArrangement = Arrangement.spacedBy(MainScreenDefaults.CONTENT_SPACING.dp)
     ) {
-        item {
-            PlayerStatusCard(
-                playerState = playerState,
-                connectionInfo = connectionInfo
-            )
-        }
-
-        item {
-            PlayerLogsCard(logs = playerLogs)
-        }
-
-        // TODO: Replace with actual groups from SnapcastRepository
-        items(MainScreenDefaults.PREVIEW_GROUP_COUNT) { index ->
-            val groupName = "Group $index"
+        items(groups.size) { index ->
+            val group = groups[index]
+            val groupVolume = calculateGroupVolume(group)
+            val groupName = group.name.ifEmpty { 
+                group.streamId.ifEmpty { group.id }
+            }
+            
             GroupCard(
                 name = groupName,
-                isMuted = false,
-                onIsMutedChange = {},
-                volume = 0.5f,
-                onVolumeChange = {},
-                onSettingsClick = { onGroupSettingsClick(groupName) },
+                isMuted = group.muted,
+                onIsMutedChange = { muted -> onGroupMuteChange(group.id, muted) },
+                volume = groupVolume / 100f,
+                onVolumeChange = { volume -> onGroupVolumeChange(group.id, (volume * 100).toInt()) },
+                onSettingsClick = { onGroupSettingsClick(group) },
                 sinks = {
-                    repeat(MainScreenDefaults.PREVIEW_SINK_COUNT) { sinkIndex ->
-                        val deviceName = "Sink ${sinkIndex + 1}"
+                    group.clients.forEach { client ->
+                        val clientName = client.config.name.ifEmpty { 
+                            client.host.name.ifEmpty { client.id }
+                        }
                         GroupCardSink(
-                            name = deviceName,
-                            isMuted = false,
-                            onIsMutedChange = {},
-                            volume = 0.5f,
-                            onVolumeChange = {},
-                            onSettingsClick = { onDeviceSettingsClick(deviceName) }
+                            name = clientName,
+                            isMuted = client.config.volume.muted,
+                            onIsMutedChange = { muted -> onClientMuteChange(client.id, muted) },
+                            volume = client.config.volume.percent / 100f,
+                            onVolumeChange = { volume -> onClientVolumeChange(client.id, (volume * 100).toInt()) },
+                            onSettingsClick = { onDeviceSettingsClick(client) }
                         )
                     }
                 }
@@ -261,14 +338,25 @@ private fun MainContent(
     }
 }
 
+/**
+ * Calculate the average volume of all clients in a group
+ */
+private fun calculateGroupVolume(group: Group): Int {
+    if (group.clients.isEmpty()) return 0
+    val totalVolume = group.clients.sumOf { it.config.volume.percent }
+    return totalVolume / group.clients.size
+}
+
 @Preview(name = "Main Screen - Idle", showBackground = true, showSystemUi = true)
 @Composable
 private fun MainScreenIdlePreview() {
     SnapdroidTheme {
         MainContent(
-            playerState = PlayerState.Idle,
-            connectionInfo = null,
-            playerLogs = emptyList(),
+            groups = emptyList(),
+            onGroupMuteChange = { _, _ -> },
+            onGroupVolumeChange = { _, _ -> },
+            onClientMuteChange = { _, _ -> },
+            onClientVolumeChange = { _, _ -> },
             onGroupSettingsClick = {},
             onDeviceSettingsClick = {}
         )
@@ -280,25 +368,37 @@ private fun MainScreenIdlePreview() {
 private fun MainScreenRunningPreview() {
     SnapdroidTheme {
         MainContent(
-            playerState = PlayerState.Running,
-            connectionInfo = MainViewModel.ConnectionInfo("192.168.1.100", 1704),
-            playerLogs = listOf(
-                PlayerLogEntry("10:30:15", "INFO", "SnapcastClient", "Connected to server"),
-                PlayerLogEntry("10:30:16", "INFO", "SnapcastClient", "Stream started")
-            ),
+            groups = emptyList(),
+            onGroupMuteChange = { _, _ -> },
+            onGroupVolumeChange = { _, _ -> },
+            onClientMuteChange = { _, _ -> },
+            onClientVolumeChange = { _, _ -> },
             onGroupSettingsClick = {},
             onDeviceSettingsClick = {}
         )
     }
 }
 
-@Preview(name = "Main Top Bar", showBackground = true)
+@Preview(name = "Main Top Bar - Default Port", showBackground = true)
 @Composable
 private fun MainTopBarPreview() {
     SnapdroidTheme {
         MainTopBar(
-            subtitle = "192.168.1.100:1704",
-            onSettingsClick = {}
+            subtitle = "192.168.1.100",
+            onSettingsClick = {},
+            onLogsClick = {}
+        )
+    }
+}
+
+@Preview(name = "Main Top Bar - Custom Port", showBackground = true)
+@Composable
+private fun MainTopBarCustomPortPreview() {
+    SnapdroidTheme {
+        MainTopBar(
+            subtitle = "192.168.1.100:8080",
+            onSettingsClick = {},
+            onLogsClick = {}
         )
     }
 }
@@ -309,7 +409,8 @@ private fun MainTopBarNoSubtitlePreview() {
     SnapdroidTheme {
         MainTopBar(
             subtitle = null,
-            onSettingsClick = {}
+            onSettingsClick = {},
+            onLogsClick = {}
         )
     }
 }

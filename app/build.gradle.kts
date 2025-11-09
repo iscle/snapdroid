@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "de.badaix.snapcast"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         versionCode = 2900
         versionName = "0.29.0.0"
@@ -97,7 +97,13 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
 
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.accompanist.permissions)
+    
+    implementation(libs.androidx.datastore.preferences)
+
     implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
     kapt(libs.hilt.compiler)
 
     implementation(libs.kotlin.serialization.json)

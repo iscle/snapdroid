@@ -41,6 +41,7 @@ class SnapcastApiService(
     val json = Json {
         explicitNulls = false
         ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -145,16 +146,19 @@ class SnapcastApiService(
         withContext(Dispatchers.IO) {
             val bufferedReader = reader ?: return@withContext
             try {
+                Timber.d("Starting to read messages from TCP socket")
                 while (coroutineContext.isActive && socket?.isConnected == true) {
                     val line = bufferedReader.readLine() ?: break
                     if (line.isBlank()) continue
                     
+                    Timber.v("Received raw message: $line")
                     try {
                         processMessage(line)
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to process message: $line")
                     }
                 }
+                Timber.d("Stopped reading messages from TCP socket")
             } catch (e: Exception) {
                 if (coroutineContext.isActive) {
                     Timber.e(e, "Error reading from TCP socket, connection may be closed")
@@ -201,7 +205,7 @@ class SnapcastApiService(
     /**
      * Send JSON-RPC request
      */
-    suspend inline fun <T, reified R> sendRequest(
+    suspend inline fun <reified T, reified R> sendRequest(
         method: String,
         params: T?,
     ): Result<R> {
@@ -222,8 +226,10 @@ class SnapcastApiService(
 
                 // Serialize request and append newline (ndjson format)
                 val requestJson = json.encodeToString(request)
+                Timber.v("Request JSON: $requestJson")
                 currentWriter.println(requestJson)
                 currentWriter.flush()
+                Timber.v("Request sent and flushed")
 
                 val response = deferred.await()
                 pendingRequests.remove(id.value)

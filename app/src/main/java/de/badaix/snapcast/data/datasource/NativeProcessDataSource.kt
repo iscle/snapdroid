@@ -2,7 +2,7 @@ package de.badaix.snapcast.data.datasource
 
 import android.content.Context
 import android.media.AudioManager
-import android.os.Build
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.badaix.snapcast.domain.model.AudioConfiguration
 import de.badaix.snapcast.domain.model.AudioEngine
@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,6 +27,8 @@ import javax.inject.Singleton
 class NativeProcessDataSource @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val audioManager = ContextCompat.getSystemService(context, AudioManager::class.java)
+        ?: throw IllegalStateException("AudioManager not available")
     private var nativeProcess: Process? = null
     private var logReaderThread: Thread? = null
     private val _logEntries = MutableSharedFlow<PlayerLogEntry>(extraBufferCapacity = 64)
@@ -59,10 +59,6 @@ class NativeProcessDataSource @Inject constructor(
 
             val command = buildList {
                 add("${context.applicationInfo.nativeLibraryDir}/libsnapclient.so")
-                add("-h")
-                add(params.serverHost)
-                add("-p")
-                add(params.serverPort.toString())
                 add("--hostID")
                 add(deviceId)
                 add("--player")
@@ -71,6 +67,7 @@ class NativeProcessDataSource @Inject constructor(
                 add(sampleFormat)
                 add("--logfilter")
                 add("*:info,Stats:debug")
+                add("tcp://${params.serverHost}:${params.serverPort}")
             }
 
             val processBuilder = ProcessBuilder(command)
@@ -104,7 +101,7 @@ class NativeProcessDataSource @Inject constructor(
 
         logReaderThread = Thread {
             try {
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                process.inputStream.bufferedReader().use { reader ->
                     reader.lineSequence().forEach { line ->
                         parseAndEmitLog(line)
                     }
@@ -126,27 +123,32 @@ class NativeProcessDataSource @Inject constructor(
             Timber.d("Player process initialized")
         }
 
-        val severityOpen = line.indexOf('[')
-        val severityClose = line.indexOf(']', severityOpen)
-        val tagOpen = line.indexOf('(', severityClose)
-        val tagClose = line.indexOf(')', tagOpen)
+        val matchResult = LOG_PATTERN.find(line)
+        if (matchResult == null) {
+            // Log unparsed lines to Timber for debugging
+            Timber.d("[Native] $line")
+            return
+        }
 
-        if (severityOpen > 0 && severityClose > 0) {
-            val timestamp = line.substring(0, severityOpen - 1)
-            val severity = line.substring(severityOpen + 1, severityClose)
-            val tag = if (tagOpen > 0 && tagClose > 0) {
-                line.substring(tagOpen + 1, tagClose)
-            } else {
-                ""
-            }
-            val message = line.substring(
-                maxOf(severityClose, if (tagClose > 0) tagClose else severityClose) + 2
-            )
+        val (_, timestamp, severity, tag, message) = matchResult.groupValues
+        val entry = PlayerLogEntry(timestamp, severity, tag, message)
 
-            val entry = PlayerLogEntry(timestamp, severity, tag, message)
-            _logEntries.tryEmit(entry)
+        // Log to Timber based on severity
+        logToTimber(severity, tag, message)
 
-            handleSpecialLogMessages(message)
+        _logEntries.tryEmit(entry)
+        handleSpecialLogMessages(message)
+    }
+
+    private fun logToTimber(severity: String, tag: String, message: String) {
+        val logMessage = "[$tag] $message"
+        when (severity.uppercase()) {
+            "TRACE", "DEBUG" -> Timber.d(logMessage)
+            "INFO", "NOTICE" -> Timber.i(logMessage)
+            "WARNING" -> Timber.w(logMessage)
+            "ERROR" -> Timber.e(logMessage)
+            "FATAL", "ALERT", "EMERG" -> Timber.e(logMessage)
+            else -> Timber.d(logMessage)
         }
     }
 
@@ -179,23 +181,16 @@ class NativeProcessDataSource @Inject constructor(
         }
     }
 
-    suspend fun getCurrentSampleRate(): String? = withContext(Dispatchers.IO) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
-        } else {
-            null
-        }
+    fun getCurrentSampleRate(): String? {
+        return audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
     }
 
-    suspend fun getCurrentFramesPerBuffer(): String? = withContext(Dispatchers.IO) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
-        } else {
-            null
-        }
+    fun getCurrentFramesPerBuffer(): String? {
+        return audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
     }
 
+    companion object {
+        private val LOG_PATTERN = Regex("""^(\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}\.\d{3}) \[([^]]+)](?: \(([^)]+)\))? (.*)$""")
+    }
 }
 

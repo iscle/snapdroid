@@ -28,9 +28,7 @@ import de.badaix.snapcast.data.api.GroupSetStreamParams
 import de.badaix.snapcast.data.api.GroupSetStreamResult
 import de.badaix.snapcast.data.api.ServerDeleteClientParams
 import de.badaix.snapcast.data.api.ServerDeleteClientResult
-import de.badaix.snapcast.data.api.ServerGetRPCVersionParams
 import de.badaix.snapcast.data.api.ServerGetRPCVersionResult
-import de.badaix.snapcast.data.api.ServerGetStatusParams
 import de.badaix.snapcast.data.api.ServerGetStatusResult
 import de.badaix.snapcast.data.api.ServerOnUpdateParams
 import de.badaix.snapcast.data.api.StreamAddStreamParams
@@ -75,9 +73,9 @@ class SnapcastRepositoryImpl @Inject constructor(
 
     override suspend fun getRpcVersion(): Result<RpcVersion> {
         Timber.d("getRpcVersion() called")
-        return apiService.sendRequest<ServerGetRPCVersionParams, ServerGetRPCVersionResult>(
+        return apiService.sendRequest<Nothing?, ServerGetRPCVersionResult>(
             method = "Server.GetRPCVersion",
-            params = ServerGetRPCVersionParams
+            params = null
         ).map { it.toRpcVersion() }
             .also { result ->
                 result.fold(
@@ -89,9 +87,9 @@ class SnapcastRepositoryImpl @Inject constructor(
 
     override suspend fun getServerStatus(): Result<Server> {
         Timber.d("getServerStatus() called")
-        return apiService.sendRequest<ServerGetStatusParams, ServerGetStatusResult>(
+        return apiService.sendRequest<Nothing?, ServerGetStatusResult>(
             method = "Server.GetStatus",
-            params = ServerGetStatusParams
+            params = null
         ).map { it.server }
             .also { result ->
                 result.fold(
