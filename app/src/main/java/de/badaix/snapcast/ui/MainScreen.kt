@@ -199,9 +199,16 @@ fun MainScreen(
         if (groupSettingsOpen && selectedGroup != null) {
             GroupSettingsBottomSheet(
                 group = selectedGroup!!,
+                allGroups = groups,
                 onDismiss = {
                     groupSettingsOpen = false
                     selectedGroup = null
+                },
+                onRename = { newName ->
+                    viewModel.setGroupName(selectedGroup!!.id, newName)
+                },
+                onUpdateClients = { clientIds ->
+                    viewModel.setGroupClients(selectedGroup!!.id, clientIds)
                 }
             )
         }
@@ -212,6 +219,12 @@ fun MainScreen(
                 onDismiss = {
                     deviceSettingsOpen = false
                     selectedClient = null
+                },
+                onRename = { newName ->
+                    viewModel.setClientName(selectedClient!!.id, newName)
+                },
+                onDelete = {
+                    viewModel.deleteClient(selectedClient!!.id)
                 }
             )
         }

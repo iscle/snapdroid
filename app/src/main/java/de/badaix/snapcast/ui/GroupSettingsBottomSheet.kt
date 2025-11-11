@@ -9,13 +9,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -41,12 +55,18 @@ private object GroupSettingsBottomSheetDefaults {
 @Composable
 fun GroupSettingsBottomSheet(
     group: Group,
-    onDismiss: () -> Unit
+    allGroups: List<Group>,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit = {},
+    onUpdateClients: (List<String>) -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val groupName = group.name.ifEmpty { 
         group.streamId.ifEmpty { group.id }
     }
+    
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showManageClientsDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -104,8 +124,72 @@ fun GroupSettingsBottomSheet(
                 DetailRow(label = clientName, value = status)
             }
 
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = GroupSettingsBottomSheetDefaults.DIVIDER_VERTICAL_PADDING.dp)
+            )
+
+            // Action Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = GroupSettingsBottomSheetDefaults.VERTICAL_PADDING.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = { showRenameDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Rename",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Rename")
+                }
+                
+                FilledTonalButton(
+                    onClick = { showManageClientsDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Group,
+                        contentDescription = "Manage Clients",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Manage")
+                }
+            }
+
             Spacer(modifier = Modifier.height(GroupSettingsBottomSheetDefaults.BOTTOM_SPACER.dp))
         }
+    }
+    
+    // Rename Dialog
+    if (showRenameDialog) {
+        RenameDialog(
+            title = "Rename Group",
+            currentName = group.name,
+            onDismiss = { showRenameDialog = false },
+            onConfirm = { newName ->
+                onRename(newName)
+                showRenameDialog = false
+                onDismiss()
+            }
+        )
+    }
+    
+    // Manage Clients Dialog
+    if (showManageClientsDialog) {
+        ManageClientsDialog(
+            group = group,
+            allGroups = allGroups,
+            onDismiss = { showManageClientsDialog = false },
+            onConfirm = { clientIds ->
+                onUpdateClients(clientIds)
+                showManageClientsDialog = false
+                onDismiss()
+            }
+        )
     }
 }
 
@@ -134,6 +218,119 @@ private fun DetailRow(
             modifier = Modifier.weight(1f)
         )
     }
+}
+
+@Composable
+private fun RenameDialog(
+    title: String,
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ManageClientsDialog(
+    group: Group,
+    allGroups: List<Group>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>) -> Unit
+) {
+    // Get all clients from all groups
+    val allClients = allGroups.flatMap { it.clients }.distinctBy { it.id }
+    
+    // Start with current group's client IDs
+    var selectedClientIds by remember { 
+        mutableStateOf(group.clients.map { it.id }.toSet())
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage Group Clients") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Select which clients belong to this group:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                allClients.forEach { client ->
+                    val clientName = client.config.name.ifEmpty { 
+                        client.host.name.ifEmpty { client.id }
+                    }
+                    val isSelected = selectedClientIds.contains(client.id)
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { checked ->
+                                selectedClientIds = if (checked) {
+                                    selectedClientIds + client.id
+                                } else {
+                                    selectedClientIds - client.id
+                                }
+                            }
+                        )
+                        Text(
+                            text = clientName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(selectedClientIds.toList()) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Preview(name = "Group Settings Bottom Sheet", showBackground = true)
@@ -195,6 +392,7 @@ private fun GroupSettingsBottomSheetPreview() {
                 name = "Living Room",
                 streamId = "default"
             ),
+            allGroups = listOf(), // Empty for preview simplicity
             onDismiss = {}
         )
     }

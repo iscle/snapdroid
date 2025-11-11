@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.badaix.snapcast.domain.model.DiscoveredServer
 import de.badaix.snapcast.domain.repository.MdnsRepository
@@ -32,7 +33,7 @@ class MdnsRepositoryImpl @Inject constructor(
 
         // Acquire multicast lock for Android 9+
         // https://stackoverflow.com/questions/53615125/nsdmanager-discovery-does-not-work-on-android-9
-        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        val wifiManager = ContextCompat.getSystemService(context.applicationContext, WifiManager::class.java)
         multicastLock = wifiManager?.createMulticastLock("snapcast_mdns")?.apply {
             setReferenceCounted(true)
             acquire()
@@ -44,6 +45,7 @@ class MdnsRepositoryImpl @Inject constructor(
             }
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                Timber.d("Service resolved: ${serviceInfo.serviceName}")
                 val host = serviceInfo.host?.hostAddress ?: serviceInfo.host?.canonicalHostName
                 if (host != null) {
                     val server = DiscoveredServer(

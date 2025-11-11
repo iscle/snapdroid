@@ -68,7 +68,9 @@ class MainViewModel @Inject constructor(
         observePlayerLogs()
         observeServerUpdates()
         observeClientVolumeChanges()
+        observeClientNameChanges()
         observeGroupMuteChanges()
+        observeGroupNameChanges()
         observeClientConnections()
         observeClientDisconnections()
         observeServerConfiguration()
@@ -140,6 +142,30 @@ class MainViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
+    private fun observeClientNameChanges() {
+        snapcastRepository.observeClientNameChanges()
+            .onEach { (clientId, name) ->
+                _groups.value = _groups.value.map { group ->
+                    group.copy(
+                        clients = group.clients.map { client ->
+                            if (client.id == clientId) {
+                                client.copy(
+                                    config = client.config.copy(name = name)
+                                )
+                            } else {
+                                client
+                            }
+                        }
+                    )
+                }
+                Timber.d("Client name changed: $clientId -> $name")
+            }
+            .catch { e ->
+                Timber.e(e, "Error observing client name changes")
+            }
+            .launchIn(viewModelScope)
+    }
+
     private fun observeGroupMuteChanges() {
         snapcastRepository.observeGroupMuteChanges()
             .onEach { (groupId, muted) ->
@@ -154,6 +180,24 @@ class MainViewModel @Inject constructor(
             }
             .catch { e ->
                 Timber.e(e, "Error observing group mute changes")
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun observeGroupNameChanges() {
+        snapcastRepository.observeGroupNameChanges()
+            .onEach { (groupId, name) ->
+                _groups.value = _groups.value.map { group ->
+                    if (group.id == groupId) {
+                        group.copy(name = name)
+                    } else {
+                        group
+                    }
+                }
+                Timber.d("Group name changed: $groupId -> $name")
+            }
+            .catch { e ->
+                Timber.e(e, "Error observing group name changes")
             }
             .launchIn(viewModelScope)
     }
@@ -399,6 +443,81 @@ class MainViewModel @Inject constructor(
                     _errorMessage.value = "Failed to set client mute: ${e.message}"
                     // Note: We don't revert the optimistic update here because
                     // the server will send the actual state via notifications
+                }
+        }
+    }
+
+    fun setClientName(clientId: String, name: String) {
+        viewModelScope.launch {
+            // Send to server - the Client.OnNameChanged notification will update with actual value
+            snapcastRepository.setClientName(clientId, name)
+                .onSuccess { newName ->
+                    Timber.i("Client name set successfully: $clientId -> $newName")
+                    _groups.value = _groups.value.map { group ->
+                        group.copy(
+                            clients = group.clients.map { client ->
+                                if (client.id == clientId) {
+                                    client.copy(
+                                        config = client.config.copy(name = newName)
+                                    )
+                                } else {
+                                    client
+                                }
+                            }
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    Timber.e(e, "Failed to set client name")
+                    _errorMessage.value = "Failed to set client name: ${e.message}"
+                }
+        }
+    }
+
+    fun setGroupName(groupId: String, name: String) {
+        viewModelScope.launch {
+            snapcastRepository.setGroupName(groupId, name)
+                .onSuccess { newName ->
+                    Timber.i("Group name set successfully: $groupId -> $newName")
+                    _groups.value = _groups.value.map { group ->
+                        if (group.id == groupId) {
+                            group.copy(name = newName)
+                        } else {
+                            group
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    Timber.e(e, "Failed to set group name")
+                    _errorMessage.value = "Failed to set group name: ${e.message}"
+                }
+        }
+    }
+
+    fun deleteClient(clientId: String) {
+        viewModelScope.launch {
+            snapcastRepository.deleteClient(clientId)
+                .onSuccess { server ->
+                    Timber.i("Client deleted successfully: $clientId")
+                    _groups.value = server.groups
+                }
+                .onFailure { e ->
+                    Timber.e(e, "Failed to delete client")
+                    _errorMessage.value = "Failed to delete client: ${e.message}"
+                }
+        }
+    }
+
+    fun setGroupClients(groupId: String, clientIds: List<String>) {
+        viewModelScope.launch {
+            snapcastRepository.setGroupClients(groupId, clientIds)
+                .onSuccess { server ->
+                    Timber.i("Group clients set successfully: $groupId")
+                    _groups.value = server.groups
+                }
+                .onFailure { e ->
+                    Timber.e(e, "Failed to set group clients")
+                    _errorMessage.value = "Failed to set group clients: ${e.message}"
                 }
         }
     }

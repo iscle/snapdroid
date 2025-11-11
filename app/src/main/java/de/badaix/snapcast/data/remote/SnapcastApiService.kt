@@ -256,16 +256,14 @@ class SnapcastApiService(
 
     /**
      * Observe TCP socket notifications
+     * This flow will wait for notifications even if not yet connected
      */
     fun observeNotifications(): Flow<JsonRpcNotification<JsonObject>> = flow {
-        if (socket == null || socket?.isConnected != true) {
-            Timber.w("TCP socket is not connected, cannot observe notifications")
-            return@flow
-        }
         Timber.d("Starting to observe TCP socket notifications")
         try {
-            while (coroutineContext.isActive && socket?.isConnected == true) {
+            while (coroutineContext.isActive) {
                 val notification = notificationChannel.receive()
+                Timber.d("Emitting notification: $notification")
                 emit(notification)
             }
         } catch (e: Exception) {
